@@ -11,8 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY python-backend-chat/requirements.txt /app/requirements.txt
-RUN --mount=type=cache,id=pip-cache,target=/root/.cache/pip \
-    python -m pip install --upgrade pip setuptools wheel && \
+RUN python -m pip install --upgrade pip setuptools wheel && \
     pip install --retries 5 --default-timeout 120 -r /app/requirements.txt
 
 COPY python-backend-chat/professor_clone.py /app/professor_clone.py
