@@ -16,7 +16,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --retries 5 --default-timeout 120 -r /app/requirements.txt
 
 COPY python-backend-chat/professor_clone.py /app/professor_clone.py
-COPY python-backend-chat/docs /app/docs
+RUN mkdir -p /app/docs
 
 # DB lives on a named volume at runtime; ensure path exists
 RUN mkdir -p /app/professor_db

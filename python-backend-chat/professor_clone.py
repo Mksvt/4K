@@ -498,6 +498,10 @@ def chunk_text(text, size=800):
 
 def ingest_documents():
 
+    if str(os.environ.get("SKIP_INGEST", "")).lower() in {"1", "true", "yes"}:
+        print("SKIP_INGEST is set; skipping ingestion.")
+        return
+
     if collection.count() > 0:
         print("Database already populated.")
         return
@@ -507,7 +511,12 @@ def ingest_documents():
     all_chunks = []
     all_ids = []
 
-    for file in Path(DOCS_FOLDER).iterdir():
+    docs_path = Path(DOCS_FOLDER)
+    if not docs_path.exists():
+        print(f"Docs folder not found: {docs_path.resolve()}. Skipping ingestion.")
+        return
+
+    for file in docs_path.iterdir():
         # Print the file name
         print(f"Processing file: {file.name}")
 
