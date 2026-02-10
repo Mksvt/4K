@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM python:3.11
+FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -11,11 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY python-backend-chat/requirements.txt /app/requirements.txt
-RUN python -m pip install --upgrade pip setuptools wheel && \
-    pip install --retries 5 --default-timeout 120 -r /app/requirements.txt
+RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir --retries 5 --default-timeout 120 -r /app/requirements.txt
 
 COPY python-backend-chat/professor_clone.py /app/professor_clone.py
-RUN mkdir -p /app/docs
+RUN mkdir -p /app/docs && rm -rf /root/.cache
 RUN mkdir -p /app/professor_db
 
 WORKDIR /app
