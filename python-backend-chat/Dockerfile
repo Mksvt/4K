@@ -11,13 +11,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY python-backend-chat/requirements.txt /app/requirements.txt
-RUN python -m pip install --upgrade pip setuptools wheel && \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install --upgrade pip setuptools wheel && \
     pip install --retries 5 --default-timeout 120 -r /app/requirements.txt
 
 COPY python-backend-chat/professor_clone.py /app/professor_clone.py
 RUN mkdir -p /app/docs
-
-# DB lives on a named volume at runtime; ensure path exists
 RUN mkdir -p /app/professor_db
 
 WORKDIR /app
