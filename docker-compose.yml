@@ -1,0 +1,55 @@
+services:
+  python-api:
+    build:
+      context: .
+      dockerfile: python-backend-chat/Dockerfile
+    env_file:
+      - python-backend-chat/.env
+    volumes:
+      - python_db:/app/professor_db
+    expose:
+      - '8000'
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: apigateway+frontend/backend
+      dockerfile: Dockerfile
+    env_file:
+      - apigateway+frontend/backend/.env
+    environment:
+      - PORT=3000
+      - PYTHON_API_URL=http://python-api:8000
+    expose:
+      - '3000'
+    depends_on:
+      - python-api
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: .
+      dockerfile: deploy/nginx/Dockerfile
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_etc:/etc/letsencrypt
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_etc:/etc/letsencrypt
+    entrypoint: '/bin/sh -c'
+    command: 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $$!; done;'
+    restart: unless-stopped
+
+volumes:
+  python_db:
+  certbot_www:
+  certbot_etc:

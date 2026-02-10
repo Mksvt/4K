@@ -1,0 +1,14 @@
+**/.git
+**/.gitignore
+**/.DS_Store
+**/__pycache__
+**/.mypy_cache
+**/.pytest_cache
+**/node_modules
+**/dist
+**/.venv
+**/*.tgz
+
+# Not used by Docker builds; large sources
+models/
+professor_db/
