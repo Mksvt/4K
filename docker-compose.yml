@@ -45,8 +45,20 @@ services:
     volumes:
       - certbot_www:/var/www/certbot
       - certbot_etc:/etc/letsencrypt
-    entrypoint: '/bin/sh -c'
-    command: 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $$!; done;'
+    entrypoint: ''
+    command: 'certbot certonly --webroot -w /var/www/certbot -d machinahankinsiana.com -d www.machinahankinsiana.com --non-interactive --agree-tos --email maksim.musiak@4k.com.ua'
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: apigateway+frontend/frontend
+      dockerfile: Dockerfile
+    ports:
+      - '8080:80'
+    environment:
+      - VITE_API_URL=http://backend:3000
+    depends_on:
+      - backend
     restart: unless-stopped
 
 volumes:

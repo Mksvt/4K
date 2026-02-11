@@ -1,0 +1,8 @@
+# Исключаем ненужные файлы и папки
+node_modules
+dist
+*.log
+.vscode
+.idea
+.DS_Store
+*.suo

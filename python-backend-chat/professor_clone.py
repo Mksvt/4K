@@ -10,15 +10,14 @@ import anthropic
 from fastapi import FastAPI
 import uvicorn
 from pydantic import BaseModel
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
 
 # ---------- CONFIG ----------
+from dotenv import load_dotenv 
+load_dotenv()
 
 DOCS_FOLDER = "./docs"
 DB_PATH = "./professor_db"
+ANTHROPIC_API_KEY=os.getenv("ANTHROPIC_API_KEY")
 
 PERSONA = """
 MACHINA HANKINSIANA: COMPLETE SYSTEM PROMPT
@@ -453,13 +452,8 @@ claude = anthropic.Anthropic(
 
 app = FastAPI()
 
-
-@app.get("/health")
-def health():
-    return {"ok": True}
-
-class ChatMessageRequest(BaseModel):
-    prompt: str
+class MessageRequest(BaseModel):
+    message: str
 
 # ---------- EMBEDDING MODEL ----------
 
@@ -498,10 +492,6 @@ def chunk_text(text, size=800):
 
 def ingest_documents():
 
-    if str(os.environ.get("SKIP_INGEST", "")).lower() in {"1", "true", "yes"}:
-        print("SKIP_INGEST is set; skipping ingestion.")
-        return
-
     if collection.count() > 0:
         print("Database already populated.")
         return
@@ -511,12 +501,7 @@ def ingest_documents():
     all_chunks = []
     all_ids = []
 
-    docs_path = Path(DOCS_FOLDER)
-    if not docs_path.exists():
-        print(f"Docs folder not found: {docs_path.resolve()}. Skipping ingestion.")
-        return
-
-    for file in docs_path.iterdir():
+    for file in Path(DOCS_FOLDER).iterdir():
         # Print the file name
         print(f"Processing file: {file.name}")
 
@@ -616,19 +601,10 @@ Question:
 #     ingest_documents()
 #     chat_loop()
 
-@app.post("/chatmessage")
-def api_chatmessage(request: ChatMessageRequest):
-
-    answer = ask_claude(request.prompt)
-
-    return {"answer": answer}
-
-
-# Backward-compatible alias (can be removed later)
 @app.post("/ask")
-def api_ask(request: ChatMessageRequest):
+def api_ask(request: MessageRequest):
 
-    answer = ask_claude(request.prompt)
+    answer = ask_claude(request.message)
 
     return {"answer": answer}
 
@@ -642,5 +618,4 @@ if __name__ == "__main__":
     print("\nServer running at:")
     print("рџ‘‰ http://localhost:8000/docs\n")
 
-    port = int(os.environ.get("PORT", "8000"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="127.0.0.1", port=8000)

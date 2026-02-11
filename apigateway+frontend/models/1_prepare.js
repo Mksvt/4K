@@ -6,15 +6,15 @@ const mammoth = require('mammoth');
 
 const apiKey = process.env.OPENAI_API_KEY;
 if (!apiKey) {
-    console.error('Missing OPENAI_API_KEY env var.');
-    process.exit(1);
+  console.error('Missing OPENAI_API_KEY env var.');
+  process.exit(1);
 }
 
 const openai = new OpenAI({ apiKey });
 
-const SOURCES_DIR = './sources'; 
+const SOURCES_DIR = './sources';
 const OUTPUT_FILE = 'training_data_hankins.jsonl';
-const EXAMPLES_PER_FILE = 4; 
+const EXAMPLES_PER_FILE = 4;
 
 const JH_CORE_INSTRUCTIONS = `
 ### TARGET PERSONA: Professor James Hankins (JH)
@@ -44,37 +44,41 @@ Use the provided text to generate Fine-Tuning examples that adhere to these spec
 `;
 
 async function extractTextFromFile(filePath) {
-    const ext = path.extname(filePath).toLowerCase();
-    try {
-        if (ext === '.pdf') {
-            const data = await pdf(fs.readFileSync(filePath));
-            return data.text;
-        } else if (ext === '.docx') {
-            const result = await mammoth.extractRawText({ path: filePath });
-            return result.value;
-        } else if (['.txt', '.md', '.csv', '.json', '.xml'].includes(ext)) {
-            return fs.readFileSync(filePath, 'utf8');
-        } else { return null; }
-    } catch (err) { return null; }
+  const ext = path.extname(filePath).toLowerCase();
+  try {
+    if (ext === '.pdf') {
+      const data = await pdf(fs.readFileSync(filePath));
+      return data.text;
+    } else if (ext === '.docx') {
+      const result = await mammoth.extractRawText({ path: filePath });
+      return result.value;
+    } else if (['.txt', '.md', '.csv', '.json', '.xml'].includes(ext)) {
+      return fs.readFileSync(filePath, 'utf8');
+    } else {
+      return null;
+    }
+  } catch (err) {
+    return null;
+  }
 }
 
 function getAllFiles(dirPath, arrayOfFiles) {
-    const files = fs.readdirSync(dirPath);
-    arrayOfFiles = arrayOfFiles || [];
-    files.forEach(file => {
-        if (fs.statSync(dirPath + "/" + file).isDirectory()) {
-            arrayOfFiles = getAllFiles(dirPath + "/" + file, arrayOfFiles);
-        } else {
-            arrayOfFiles.push(path.join(dirPath, "/", file));
-        }
-    });
-    return arrayOfFiles;
+  const files = fs.readdirSync(dirPath);
+  arrayOfFiles = arrayOfFiles || [];
+  files.forEach((file) => {
+    if (fs.statSync(dirPath + '/' + file).isDirectory()) {
+      arrayOfFiles = getAllFiles(dirPath + '/' + file, arrayOfFiles);
+    } else {
+      arrayOfFiles.push(path.join(dirPath, '/', file));
+    }
+  });
+  return arrayOfFiles;
 }
 
 async function processContent(content, fileName) {
-    const truncatedContent = content.substring(0, 20000);
+  const truncatedContent = content.substring(0, 20000);
 
-    const prompt = `
+  const prompt = `
     I am building a digital twin of Professor James Hankins (Harvard).
     Attached is a raw text file from his archives ("${fileName}").
 
@@ -112,70 +116,78 @@ async function processContent(content, fileName) {
     }
     `;
 
-    try {
-        const completion = await openai.chat.completions.create({
-            messages: [
-                { role: "system", content: "You are the 'Machina Hankinsiana' Persona Architect. You strictly enforce the voice and style of James Hankins." },
-                { role: "user", content: prompt }
-            ],
-            model: "gpt-4o", 
-            response_format: { type: "json_object" },
-            temperature: 0.7 
-        });
+  try {
+    const completion = await openai.chat.completions.create({
+      messages: [
+        {
+          role: 'system',
+          content:
+            "You are the 'Machina Hankinsiana' Persona Architect. You strictly enforce the voice and style of James Hankins.",
+        },
+        { role: 'user', content: prompt },
+      ],
+      model: 'gpt-4o',
+      response_format: { type: 'json_object' },
+      temperature: 0.7,
+    });
 
-        const parsed = JSON.parse(completion.choices[0].message.content);
-        return parsed.conversations || [];
-    } catch (e) {
-        console.error(`Error processing ${fileName}: ${e.message}`);
-        return [];
-    }
+    const parsed = JSON.parse(completion.choices[0].message.content);
+    return parsed.conversations || [];
+  } catch (e) {
+    console.error(`Error processing ${fileName}: ${e.message}`);
+    return [];
+  }
 }
 
 async function main() {
-    if (!fs.existsSync(SOURCES_DIR)) {
-        console.error(`Folder '${SOURCES_DIR}' not found.`);
-        return;
+  if (!fs.existsSync(SOURCES_DIR)) {
+    console.error(`Folder '${SOURCES_DIR}' not found.`);
+    return;
+  }
+
+  fs.writeFileSync(OUTPUT_FILE, '');
+
+  const allFiles = getAllFiles(SOURCES_DIR);
+  console.log(
+    `Found ${allFiles.length} files. Engaging Machina Hankinsiana protocols...`,
+  );
+
+  let totalDialogues = 0;
+  let processedFiles = 0;
+
+  for (const filePath of allFiles) {
+    const fileName = path.basename(filePath);
+    if (fileName.startsWith('.') || fileName === OUTPUT_FILE) continue;
+
+    const text = await extractTextFromFile(filePath);
+
+    if (text && text.trim().length > 300) {
+      process.stdout.write(
+        `[${processedFiles + 1}/${allFiles.length}] Processing ${fileName} as JH context... `,
+      );
+
+      const conversations = await processContent(text, fileName);
+
+      if (conversations && conversations.length > 0) {
+        conversations.forEach((conv) => {
+          if (conv.messages && Array.isArray(conv.messages)) {
+            const entry = { messages: conv.messages };
+            fs.appendFileSync(OUTPUT_FILE, JSON.stringify(entry) + '\n');
+          }
+        });
+
+        totalDialogues += conversations.length;
+        console.log(`SAVED (+${conversations.length} interactions)`);
+      } else {
+        console.log(`No valid dialogues generated.`);
+      }
+    } else {
+      console.log(`Skipped (too short or empty)`);
     }
+    processedFiles++;
+  }
 
-    fs.writeFileSync(OUTPUT_FILE, ''); 
-
-    const allFiles = getAllFiles(SOURCES_DIR);
-    console.log(`Found ${allFiles.length} files. Engaging Machina Hankinsiana protocols...`);
-
-    let totalDialogues = 0;
-    let processedFiles = 0;
-
-    for (const filePath of allFiles) {
-        const fileName = path.basename(filePath);
-        if (fileName.startsWith('.') || fileName === OUTPUT_FILE) continue;
-
-        const text = await extractTextFromFile(filePath);
-        
-        if (text && text.trim().length > 300) {
-            process.stdout.write(`[${processedFiles + 1}/${allFiles.length}] Processing ${fileName} as JH context... `);
-
-            const conversations = await processContent(text, fileName);
-            
-            if (conversations && conversations.length > 0) {
-                conversations.forEach(conv => {
-                    if(conv.messages && Array.isArray(conv.messages)) {
-                         const entry = { messages: conv.messages };
-                         fs.appendFileSync(OUTPUT_FILE, JSON.stringify(entry) + '\n');
-                    }
-                });
-                
-                totalDialogues += conversations.length;
-                console.log(`SAVED (+${conversations.length} interactions)`);
-            } else {
-                console.log(`No valid dialogues generated.`);
-            }
-        } else {
-            console.log(`Skipped (too short or empty)`);
-        }
-        processedFiles++;
-    }
-
-    console.log(`DONE. Total JH training examples: ${totalDialogues}`);
+  console.log(`DONE. Total JH training examples: ${totalDialogues}`);
 }
 
 main();

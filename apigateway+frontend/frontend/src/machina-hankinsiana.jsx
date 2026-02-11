@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Copy, ChevronDown, ChevronUp, Shuffle } from 'lucide-react';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim();
@@ -11,20 +11,24 @@ const apiUrl = (path) => {
 
 const MacchinaHankinsiana = () => {
   const [input, setInput] = useState('');
-  const [format, setFormat] = useState('email');
-  const [era, setEra] = useState('late');
+  
+  // Оновлені значення за замовчуванням (повні назви для кращого розуміння AI)
+  const [format, setFormat] = useState('Email Response');
+  const [era, setEra] = useState('Late Hankins (2019+)');
+  
   const [output, setOutput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [token] = useState(() => localStorage.getItem('mh_token') || '');
   const [showPrompt, setShowPrompt] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [historyData, setHistoryData] = useState([]); // Додано ініціалізацію масиву історії
   const [expandedHistory, setExpandedHistory] = useState({});
   const [copied, setCopied] = useState(false);
   const [sessionId] = useState(`session_${Date.now()}`);
 
   const randomize = () => {
-    const formats = ['email', 'conversational', 'question'];
-    const eras = ['early', 'mid', 'late'];
+    const formats = ['Email Response', 'Conversational Feedback', 'Answer a Question'];
+    const eras = ['Early Hankins (1990s)', 'Mid Hankins (2000s-2010s)', 'Late Hankins (2019+)'];
     setFormat(formats[Math.floor(Math.random() * formats.length)]);
     setEra(eras[Math.floor(Math.random() * eras.length)]);
   };
@@ -36,35 +40,29 @@ const MacchinaHankinsiana = () => {
     }));
   };
 
-  const historyData = [
-    {
-      id: 1,
-      date: '2026-02-05',
-      submissionPreview:
-        'What is your assessment of the current state of Re...',
-      submissionFull:
-        "What is your assessment of the current state of Renaissance studies, particularly regarding the accessibility of primary sources and the field's engagement with non-English scholarship?",
-      responsePreview: 'Look, this is exactly the kind of question that mod...',
-      responseFull:
-        'Look, this is exactly the kind of question that modern scholars have gotten completely wrong, and I intend to be blunt about why. The received wisdom—repeated uncritically in the Anglophone scholarship especially—is based on a handful of easily accessible texts...',
-      format: 'Question',
-      phase: 'Late',
-      phaseLabel: 'Late Hankins (2019+)',
-    },
-    {
-      id: 2,
-      date: '2026-02-04',
-      submissionPreview: "In my dissertation chapter on Leonardo Bruni's tr...",
-      submissionFull:
-        "In my dissertation chapter on Leonardo Bruni's translation of Aristotle's Politics, I argue that Bruni's choice to translate 'politeia' as 'respublica' represents a pivotal moment in the development of republican thought...",
-      responsePreview: 'Dear Colleague, Thank you for sharing this work. ...',
-      responseFull:
-        "Dear Colleague, Thank you for sharing this work. Your analysis of Bruni's translation choices shows careful attention to the Latin text, which is refreshing to see. However, I would urge you to consider the broader context of Bruni's humanist program...",
-      format: 'Email',
-      phase: 'Mid',
-      phaseLabel: 'Mid Hankins (2000s-2010s)',
-    },
-  ];
+  const fetchHistory = async () => {
+    try {
+      const response = await fetch(apiUrl('/history'), {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setHistoryData(data.history || []);
+      } else {
+        console.error('Failed to fetch history:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching history:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchHistory(); // Load history on component mount
+  }, []);
 
   const generateResponse = async () => {
     if (!input.trim() || isGenerating) return;
@@ -78,7 +76,7 @@ const MacchinaHankinsiana = () => {
     setOutput('');
 
     try {
-      const response = await fetch(apiUrl('/chatmessage'), {
+      const response = await fetch(apiUrl('/api/chatmessage'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -87,13 +85,17 @@ const MacchinaHankinsiana = () => {
         body: JSON.stringify({
           prompt: input.trim(),
           sessionId: sessionId,
+          responseFormat: format, // ВИПРАВЛЕНО: передаємо як responseFormat
+          phase: era,             // ВИПРАВЛЕНО: передаємо як phase
         }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setOutput(data.answer);
+        // Підтримуємо і answer (від Python) і response (старий формат)
+        setOutput(data.answer || data.response || '');
+        fetchHistory(); // Refresh history after generating response
       } else {
         setOutput(`Error: ${data.error || 'Unknown error occurred'}`);
       }
@@ -267,7 +269,6 @@ EASTER EGG TRIGGERS:
         </div>
 
         {/* Main Interface */}
-
         <div className="bg-[#fdfbf7] rounded-lg parchment-shadow-lg p-6 md:p-10 mb-6 slide-in border-2 border-[#d4c4a8]">
           {/* Input Area */}
           <div className="mb-8">
@@ -294,9 +295,10 @@ EASTER EGG TRIGGERS:
                 onChange={(e) => setFormat(e.target.value)}
                 className="w-full p-3.5 border-2 border-[#d4c4a8] rounded-md focus:border-[#8b6f47] focus:outline-none bg-white text-[#3a2a1a] cursor-pointer transition-all duration-200 hover:border-[#a89278]"
               >
-                <option value="email">Email Response</option>
-                <option value="conversational">Conversational</option>
-                <option value="question">Answer a Question</option>
+                {/* Оновлені значення value для інтеграції з AI */}
+                <option value="Email Response">Email Response</option>
+                <option value="Conversational Feedback">Conversational Feedback</option>
+                <option value="Answer a Question">Answer a Question</option>
               </select>
             </div>
 
@@ -309,9 +311,10 @@ EASTER EGG TRIGGERS:
                 onChange={(e) => setEra(e.target.value)}
                 className="w-full p-3.5 border-2 border-[#d4c4a8] rounded-md focus:border-[#8b6f47] focus:outline-none bg-white text-[#3a2a1a] cursor-pointer transition-all duration-200 hover:border-[#a89278]"
               >
-                <option value="early">Early Hankins (1990s)</option>
-                <option value="mid">Mid Hankins (2000s-2010s)</option>
-                <option value="late">Late Hankins (2019+)</option>
+                {/* Оновлені значення value для інтеграції з AI */}
+                <option value="Early Hankins (1990s)">Early Hankins (1990s)</option>
+                <option value="Mid Hankins (2000s-2010s)">Mid Hankins (2000s-2010s)</option>
+                <option value="Late Hankins (2019+)">Late Hankins (2019+)</option>
               </select>
             </div>
           </div>
@@ -396,111 +399,165 @@ EASTER EGG TRIGGERS:
                     </tr>
                   </thead>
                   <tbody>
-                    {historyData.map((item) => (
-                      <React.Fragment key={item.id}>
-                        <tr
-                          className="text-sm text-[#3a2a1a]"
-                          style={{ borderBottom: '1px solid #e5d9c3' }}
-                        >
-                          <td className="px-6 py-4">{item.date}</td>
-                          <td className="px-6 py-4">
-                            {item.submissionPreview}
-                          </td>
-                          <td className="px-6 py-4">{item.responsePreview}</td>
-                          <td className="px-6 py-4">{item.format}</td>
-                          <td className="px-6 py-4">{item.phase}</td>
-                          <td
-                            className="px-6 py-4"
-                            style={{ textAlign: 'right' }}
+                    {historyData && historyData.length > 0 ? (
+                      historyData.map((item) => (
+                        <React.Fragment key={item.id}>
+                          <tr
+                            className="text-sm text-[#3a2a1a]"
+                            style={{ borderBottom: '1px solid #e5d9c3' }}
                           >
-                            <button
-                              type="button"
-                              onClick={() => toggleHistoryItem(item.id)}
-                              className="inline-flex items-center justify-center"
-                              aria-label={
-                                expandedHistory[item.id]
-                                  ? 'Collapse history row'
-                                  : 'Expand history row'
-                              }
-                            >
-                              {expandedHistory[item.id] ? (
-                                <ChevronUp
-                                  size={18}
-                                  className="text-[#6b5233]"
-                                />
-                              ) : (
-                                <ChevronDown
-                                  size={18}
-                                  className="text-[#6b5233]"
-                                />
-                              )}
-                            </button>
-                          </td>
-                        </tr>
-
-                        {expandedHistory[item.id] && (
-                          <tr style={{ borderBottom: '1px solid #e5d9c3' }}>
+                            <td className="px-6 py-4">{item.date}</td>
+                            <td className="px-6 py-4">
+                              {item.submissionPreview}
+                            </td>
+                            <td className="px-6 py-4">{item.responsePreview}</td>
+                            <td className="px-6 py-4">{item.format}</td>
+                            <td className="px-6 py-4">{item.phase}</td>
                             <td
-                              colSpan={6}
-                              className="px-6 py-6"
-                              style={{ background: '#faf7f2' }}
+                              className="px-6 py-4"
+                              style={{ textAlign: 'right' }}
                             >
-                              <div className="space-y-6">
-                                <div>
-                                  <div
-                                    className="flex items-center gap-4 mb-3"
-                                    style={{ flexWrap: 'wrap' }}
-                                  >
-                                    <div className="font-semibold text-[#4a3526]">
-                                      Original Submission
-                                    </div>
-                                    <div className="text-sm text-[#6b5744]">
-                                      {item.format}
-                                    </div>
-                                    <div className="text-sm text-[#6b5744]">
-                                      {item.phaseLabel}
-                                    </div>
-                                  </div>
-                                  <div
-                                    className="text-[#3a2a1a] leading-relaxed"
-                                    style={{
-                                      background: 'rgba(255,255,255,0.75)',
-                                      padding: 16,
-                                      border: '1px solid #e5d9c3',
-                                      borderRadius: 6,
-                                    }}
-                                  >
-                                    {item.submissionFull}
-                                  </div>
-                                </div>
-
-                                <div>
-                                  <div className="font-semibold text-[#4a3526] mb-3">
-                                    MH Response
-                                  </div>
-                                  <div
-                                    className="text-[#3a2a1a] leading-relaxed"
-                                    style={{
-                                      background: 'rgba(255,255,255,0.75)',
-                                      padding: 16,
-                                      border: '1px solid #e5d9c3',
-                                      borderRadius: 6,
-                                    }}
-                                  >
-                                    {item.responseFull}
-                                  </div>
-                                </div>
-                              </div>
+                              <button
+                                type="button"
+                                onClick={() => toggleHistoryItem(item.id)}
+                                className="inline-flex items-center justify-center"
+                                aria-label={
+                                  expandedHistory[item.id]
+                                    ? 'Collapse history row'
+                                    : 'Expand history row'
+                                }
+                              >
+                                {expandedHistory[item.id] ? (
+                                  <ChevronUp
+                                    size={18}
+                                    className="text-[#6b5233]"
+                                  />
+                                ) : (
+                                  <ChevronDown
+                                    size={18}
+                                    className="text-[#6b5233]"
+                                  />
+                                )}
+                              </button>
                             </td>
                           </tr>
-                        )}
-                      </React.Fragment>
-                    ))}
+
+                          {expandedHistory[item.id] && (
+                            <tr style={{ borderBottom: '1px solid #e5d9c3' }}>
+                              <td
+                                colSpan={6}
+                                className="px-6 py-6"
+                                style={{ background: '#faf7f2' }}
+                              >
+                                <div className="space-y-6">
+                                  <div>
+                                    <div
+                                      className="flex items-center gap-4 mb-3"
+                                      style={{ flexWrap: 'wrap' }}
+                                    >
+                                      <div className="font-semibold text-[#4a3526]">
+                                        Original Submission
+                                      </div>
+                                      <div className="text-sm text-[#6b5744]">
+                                        {item.format}
+                                      </div>
+                                      <div className="text-sm text-[#6b5744]">
+                                        {item.phaseLabel || item.phase}
+                                      </div>
+                                    </div>
+                                    <div
+                                      className="text-[#3a2a1a] leading-relaxed"
+                                      style={{
+                                        background: 'rgba(255,255,255,0.75)',
+                                        padding: 16,
+                                        border: '1px solid #e5d9c3',
+                                        borderRadius: 6,
+                                      }}
+                                    >
+                                      {item.submissionFull}
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <div className="font-semibold text-[#4a3526] mb-3">
+                                      MH Response
+                                    </div>
+                                    <div
+                                      className="text-[#3a2a1a] leading-relaxed"
+                                      style={{
+                                        background: 'rgba(255,255,255,0.75)',
+                                        padding: 16,
+                                        border: '1px solid #e5d9c3',
+                                        borderRadius: 6,
+                                      }}
+                                    >
+                                      {item.responseFull}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-4 text-center text-[#8b7355] italic">
+                          No history available yet.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
             )}
           </div>
+
+          {/* Chat History (Alternative View) */}
+          {showHistory && historyData && historyData.length > 0 && (
+            <div className="bg-[#fdfbf7] rounded-lg parchment-shadow-lg p-6 md:p-10 mb-6 slide-in border-2 border-[#d4c4a8] mt-6">
+              <h2 className="text-2xl font-semibold text-[#6b5744] mb-4 title-font">
+                Chat History Summary
+              </h2>
+              <ul className="space-y-4">
+                {historyData.map((item) => (
+                  <li
+                    key={`summary-${item.id}`}
+                    className="border-b border-[#d4c4a8] pb-4"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-[#4a3526] font-medium">
+                          {item.date} - {item.phaseLabel || item.phase}
+                        </p>
+                        <p className="text-[#8b7355] italic">{item.format}</p>
+                      </div>
+                      <button
+                        onClick={() => toggleHistoryItem(`summary-${item.id}`)}
+                        className="text-[#8b6f47] hover:underline"
+                      >
+                        {expandedHistory[`summary-${item.id}`] ? 'Hide' : 'Show'} Details
+                      </button>
+                    </div>
+                    {expandedHistory[`summary-${item.id}`] && (
+                      <div className="mt-4">
+                        <p className="text-[#4a3526] font-semibold mb-2">
+                          Submission:
+                        </p>
+                        <p className="text-[#3a2a1a] mb-4">
+                          {item.submissionFull}
+                        </p>
+                        <p className="text-[#4a3526] font-semibold mb-2">
+                          Response:
+                        </p>
+                        <p className="text-[#3a2a1a]">{item.responseFull}</p>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* System Prompt */}
           <div className="bg-[#fdfbf7]/80 backdrop-blur-sm rounded-lg parchment-shadow border border-[#d4c4a8] overflow-hidden">
